@@ -39,18 +39,16 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-#define RESOLUTION 65536    // Timer1 is 16 bit
+/* Timer1 on 16-bit resolution */
+#define RESOLUTION 65536
 
 class TimerOne
 {
-  public:
-  
-    // properties
+public:
     unsigned int pwmPeriod;
     unsigned char clockSelectBits;
-	char oldSREG;					// To hold Status Register while ints disabled
+	char oldSREG;
 
-    // methods
     void initialize(long microseconds=1000000);
     void start();
     void stop();
@@ -67,5 +65,6 @@ class TimerOne
 };
 
 extern TimerOne Timer1;
-#endif
+
+#endif /* TIMERONE_h */
 

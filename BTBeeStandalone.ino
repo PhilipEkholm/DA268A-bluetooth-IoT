@@ -27,6 +27,9 @@
 #define CONN_STAT_PIN    10  /* Arduino Digital I/O 10 (Atmel PB2), O:disconnected 1:connected */
 #define DIS_CONN_PIN     A2  /* Arduino Analogue Input 2 (Atmel PC2), disconnect on rising edge */
 
+#define SERIAL_DEFAULT_BAUD_RATE    9600
+#define BT_SERIAL_DEFAULT_BAUD_RATE 38400
+
 #define DISCONNECT() do {           \
   digitalWrite(DIS_CONN_PIN, HIGH); \
   delay(50);                        \
@@ -52,7 +55,7 @@ char bt_buf[64];
 
 void setup()
 {
-	Serial.begin(9600);
+	Serial.begin(SERIAL_DEFAULT_BAUD_RATE);
 
 	pinMode(CONN_STAT_PIN, INPUT);
 	pinMode(DIS_CONN_PIN, OUTPUT);
@@ -62,7 +65,7 @@ void setup()
 	memset(bt_buf, '\0', sizeof(bt_buf));
 
 	Serial.println("Starting BTBee Stand-alone comm");
-	blueToothSerial.begin(38400); /* Default Baud rate is 38400 */
+	blueToothSerial.begin(BT_SERIAL_DEFAULT_BAUD_RATE);
 	delay(500);
 	bt_config();
 }
