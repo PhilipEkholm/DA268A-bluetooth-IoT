@@ -8,7 +8,7 @@
  *  - Add (long) assignments and casts to TimerOne::read() to ensure calculations involving tmp, ICR1 and TCNT1 aren't truncated
  *  - Ensure 16 bit registers accesses are atomic - run with interrupts disabled when accessing
  *  - Remove global enable of interrupts (sei())- could be running within an interrupt routine)
- *  - Disable interrupts whilst TCTN1 == 0.  Datasheet vague on this, but experiment shows that overflow interrupt 
+ *  - Disable interrupts whilst TCTN1 == 0.  Datasheet vague on this, but experiment shows that overflow interrupt
  *    flag gets set whilst TCNT1 == 0, resulting in a phantom interrupt.  Could just set to 1, but gets inaccurate
  *    at very short durations
  *  - startBottom() added to start counter at 0 and handle all interrupt enabling.
@@ -39,16 +39,18 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-/* Timer1 on 16-bit resolution */
-#define RESOLUTION 65536
+#define RESOLUTION 65536    // Timer1 is 16 bit
 
 class TimerOne
 {
-public:
+  public:
+
+    // properties
     unsigned int pwmPeriod;
     unsigned char clockSelectBits;
-	char oldSREG;
+	char oldSREG;					// To hold Status Register while ints disabled
 
+    // methods
     void initialize(long microseconds=1000000);
     void start();
     void stop();
@@ -65,6 +67,5 @@ public:
 };
 
 extern TimerOne Timer1;
-
-#endif /* TIMERONE_h */
+#endif
 
