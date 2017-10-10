@@ -30,9 +30,7 @@
  * - Build and flash the sketch (short command: Ctrl+U)
  * - Start the Arduino Serial Monitor (short command: Ctrl+Shift+M)
  */
- 
-void setup() {
-}
 
-void loop() {
-}
+void setup() {}
+
+void loop() {}
