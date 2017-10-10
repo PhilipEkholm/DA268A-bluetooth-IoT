@@ -136,6 +136,34 @@ void serialEvent()
   }
 }
 
+/*
+ *	timer_event, callback function for timer overflow trigger evt.
+ */
+
+static float hum = 30.1234;  /* Mocked relative humidity, 0-100 in percent */
+static float temp = 20.4321; /* Mocked temp in Deg. Celsius */
+static char sensor_data_buf[64];
+static int j = 0;
+
+void timer_event(){
+	hum++;
+	temp++;
+
+	/* Reset values when they get too big */
+	if (hum > 70 || temp > 70){
+		hum = 30.3456;
+		temp = 40.6785;
+	}
+
+	snprintf(sensor_data_buf, 21, "%f, %f", hum, temp);
+
+	if (digitalRead(CONN_STAT_PIN))
+		blueToothSerial.println(sensor_data_buf);
+
+	memset(sensor_data_buf, '\0', sizeof(sensor_data_buf));
+	j = 0;
+}
+
 void bt_config()
 {
 	sendBlueToothCommand("STNA=BTBeeStandalone");
@@ -162,6 +190,7 @@ void sendBlueToothCommand(char cmd[])
 	/* Send the BT command according to the module-syntax:
 	 * |\r|\n|+|command_chars|\r|\n|
 	 */
+
 	i = 0;
 	memset(bt_comm, '\0', sizeof(bt_comm));
 	bt_comm[i++] = '\r';
