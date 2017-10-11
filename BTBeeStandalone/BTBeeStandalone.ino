@@ -17,50 +17,58 @@
  *
  *  Version:  1.0
  *  Author:   alex.rodzevski@mah.se
- *
  */
 
 #include "SoftwareSerial.h"
 
 #include "TimerOne.h"
 
-#define RX_PIN               2
-#define TX_PIN               3
-#define CONN_STAT_PIN        10  /* Arduino Digital I/O 10 (Atmel PB2), O:disconnected 1:connected */
-#define DIS_CONN_PIN         A2  /* Arduino Analogue Input 2 (Atmel PC2), disconnect on rising edge */
+#define RX_PIN                   2
+#define TX_PIN                   3
+#define CONN_STAT_PIN            10  /* Arduino Digital I/O 10 (Atmel PB2), O:disconnected 1:connected */
+#define DIS_CONN_PIN             A2  /* Arduino Analogue Input 2 (Atmel PC2), disconnect on rising edge */
 
-#define SENSOR_BUFFER_LENGTH 24
+#define SENSOR_BUFFER_LENGTH     24
+#define TERM_BT_BUF_SIZE         64
 
-static double hum = 30.123412;  /* Mocked relative humidity, 0-100 in percent */
-static double temp = 20.432143; /* Mocked temp in Deg. Celsius */
+#define DEF_BAUD_RATE            9600
+
+#define SEND_SENSOR_DATA_RATE_US 3000000
+#define SENSOR_DATA_PREC         4
+#define SENSOR_DATA_HUM_DEF_VAL  30.345621
+#define SENSOR_DATA_TEMP_DEF_VAL 20.432143
+
+static double hum = SENSOR_DATA_HUM_DEF_VAL;
+static double temp = SENSOR_DATA_TEMP_DEF_VAL;
 static char sensor_data_buf[SENSOR_BUFFER_LENGTH + 1]; /* Add 1 due to '\0' */
 
-#define DISCONNECT() do {           \
-  digitalWrite(DIS_CONN_PIN, HIGH); \
-  delay(50);                        \
-  digitalWrite(DIS_CONN_PIN, LOW);  \
+#define DISCONNECT() do {             \
+	digitalWrite(DIS_CONN_PIN, HIGH); \
+	delay(50);                        \
+	digitalWrite(DIS_CONN_PIN, LOW);  \
 } while (0)
 
-/* Comment out to de-activate debug prints */
-#define DEBUG
-#ifdef DEBUG
-#define D_WRITE(x)    Serial.write(x)
-#define D_PRINT(x)    Serial.print(x)
-#define D_PRINTLN(x)  Serial.println(x)
+/* Set DEBUG to 1 to enable debugging */
+#define DEBUG 0
+
+#if DEBUG
+	#define D_WRITE(x)    Serial.write(x)
+	#define D_PRINT(x)    Serial.print(x)
+	#define D_PRINTLN(x)  Serial.println(x)
 #else
-#define D_WRITE(x)
-#define D_PRINT(x)
-#define D_PRINTLN(x)
+	#define D_WRITE(x)
+	#define D_PRINT(x)
+	#define D_PRINTLN(x)
 #endif
 
 SoftwareSerial blueToothSerial(RX_PIN,TX_PIN);
 
-char term_buf[64];
-char bt_buf[64];
+char term_buf[TERM_BT_BUF_SIZE];
+char bt_buf[TERM_BT_BUF_SIZE];
 
 void setup()
 {
-	Serial.begin(9600);
+	Serial.begin(DEF_BAUD_RATE);
 
 	pinMode(CONN_STAT_PIN, INPUT);
 	pinMode(DIS_CONN_PIN, OUTPUT);
@@ -71,6 +79,7 @@ void setup()
 
 	Serial.println("Starting BTBee Stand-alone comm");
 	blueToothSerial.begin(38400); /* Default Baud rate is 38400 */
+
 	delay(500);
 	bt_config();
 }
@@ -80,10 +89,10 @@ void loop()
 	static int i = 0, master_conn = 0;
 
 	/* Handle incomming Bluetooth strings */
- 	while (blueToothSerial.available() && i < sizeof(bt_buf)) {
+	while (blueToothSerial.available() && i < sizeof(bt_buf)) {
 		bt_buf[i++] = blueToothSerial.read();
 		delay(1);
-  	}
+	}
 
 	/* Parse the string upon new-line */
 	if (bt_buf[i-1] == '\n') {
@@ -91,7 +100,8 @@ void loop()
 
 		if(strstr(bt_buf, "LINK LOSS")) {
 			DISCONNECT();
-      Timer1.detachInterrupt();
+			/* Remove any callbacks set */
+			Timer1.detachInterrupt();
 			master_conn = 0;
 		}
 		else if(strstr(bt_buf, "CONNECT:OK")) {
@@ -104,18 +114,22 @@ void loop()
 
 			delay(2000);
 			blueToothSerial.println("\nHello Master, I will loopback everything you send me!\n");
-      Timer1.initialize(3000000);
-      Timer1.attachInterrupt(timer_event);  // attaches callback() as a timer overflow interrupt
+			blueToothSerial.println("I will also give you mocked temperature and humidity values!\n")
+
+			/* init timer1 on arduino, trigger every 3rd sec */
+			Timer1.initialize(SEND_SENSOR_DATA_RATE_US);
+			/* Attach an interrupt to our callback function */
+			Timer1.attachInterrupt(timer_event);
 			master_conn = 1;
 		}
 		else if (master_conn) {
 			blueToothSerial.println(bt_buf);
 		}
 
-	/* clear buffer & pointer */
-	memset(bt_buf, '\0', sizeof(bt_buf));
-	i = 0;
-  }
+		/* clear buffer & pointer */
+		memset(bt_buf, '\0', sizeof(bt_buf));
+		i = 0;
+	}
 }
 
 /*
@@ -124,27 +138,30 @@ void loop()
  */
 void serialEvent()
 {
-  static int i = 0;
+	static int i = 0;
 
-  /* Handle incoming Terminal strings  */
-  while (Serial.available() && i < sizeof(term_buf)) {
-	term_buf[i++] = Serial.read();
-	delay(1);
-  }
-  /* Parse the string upon new-line */
-  if (term_buf[i-1] == '\n') {
-	D_PRINT("\nTERM:");
-	D_PRINTLN(term_buf);
-	if(strncmp(term_buf, "CONF", strlen("CONF")) == 0)
-	  bt_config();
-	else if(strncmp(term_buf, "DISC", strlen("DISC")) == 0)
-	  DISCONNECT();
-	else if (digitalRead(CONN_STAT_PIN))
-	  blueToothSerial.println(term_buf);
-	/* clear buffer & pointer */
-	memset(term_buf, '\0', sizeof(term_buf));
-	i = 0;
-  }
+	/* Handle incoming Terminal strings  */
+	while (Serial.available() && i < sizeof(term_buf)) {
+		term_buf[i++] = Serial.read();
+		delay(1);
+	}
+
+	/* Parse the string upon new-line */
+	if (term_buf[i-1] == '\n') {
+		D_PRINT("\nTERM:");
+		D_PRINTLN(term_buf);
+
+		if(strncmp(term_buf, "CONF", strlen("CONF")) == 0)
+			bt_config();
+		else if(strncmp(term_buf, "DISC", strlen("DISC")) == 0)
+			DISCONNECT();
+		else if (digitalRead(CONN_STAT_PIN))
+			blueToothSerial.println(term_buf);
+
+		/* clear buffer & pointer */
+		memset(term_buf, '\0', sizeof(term_buf));
+		i = 0;
+	}
 }
 
 /*
@@ -152,28 +169,33 @@ void serialEvent()
  */
 
 void timer_event(){
-  char temp_convert_buffer[4];
-  char hum_convert_buffer[4];
+	char temp_convert_buffer[SENSOR_DATA_PREC];
+	char hum_convert_buffer[SENSOR_DATA_PREC];
 
-  dtostrf(hum++, 4, 2, hum_convert_buffer);
-  dtostrf(temp++, 4, 2, temp_convert_buffer);
+	/*
+	 * Arduino doesn't support snprintf for floating ops,
+	 * so other means of converting the floats to strings are
+	 * necessary.
+	 */
+	dtostrf(hum++, SENSOR_DATA_PREC, 2, hum_convert_buffer);
+	dtostrf(temp++, SENSOR_DATA_PREC, 2, temp_convert_buffer);
 
 	/* Reset values when they get too big */
-	if (hum > 70 || temp > 70){
-		hum = 30.345621;
-		temp = 40.678563;
-	}
+	if (hum > 100)
+		hum = SENSOR_DATA_HUM_DEF_VAL;
+	if (temp > 100)
+		temp = SENSOR_DATA_TEMP_DEF_VAL;
 
 	snprintf(sensor_data_buf, SENSOR_BUFFER_LENGTH, "Temp: %s, Hum: %s", temp_convert_buffer, hum_convert_buffer);
-  D_PRINTLN(sensor_data_buf);
+	D_PRINTLN(sensor_data_buf);
 
-	if (digitalRead(CONN_STAT_PIN)){
+	/* Probably not needed, but check if connection is still up */
+	if (digitalRead(CONN_STAT_PIN))
 		blueToothSerial.println(sensor_data_buf);
-  }
 
-  /* clear buffer & pointer */
-  memset(temp_convert_buffer, '\0', sizeof(temp_convert_buffer));
-  memset(hum_convert_buffer, '\0', sizeof(hum_convert_buffer));
+	/* clear buffer & pointer */
+	memset(temp_convert_buffer, '\0', sizeof(temp_convert_buffer));
+	memset(hum_convert_buffer, '\0', sizeof(hum_convert_buffer));
 	memset(sensor_data_buf, '\0', sizeof(sensor_data_buf));
 }
 
