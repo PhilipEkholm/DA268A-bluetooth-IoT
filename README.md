@@ -1,2 +1,3 @@
-# bluetooth-iot
-Lab 3 i Mobila System
+# DA268A-bluetooth-IoT
+
+Part of assignment during Mobile Systems course, second year computer engineering. The assignment involves bluetooth setup with modules that record temperature.
